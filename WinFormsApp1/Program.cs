@@ -344,16 +344,13 @@ namespace OLEDSaver
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-
-
             InitializeMonitorSettings();
             LoadSettings();
+            MagicTrick();
             SetupTrayIcon();
             SetupOverlayWindows();
             StartInactivityTimer();
             StartEdgeTimer();
-            MagicTrick();
-
 
             Application.Run();
         }
@@ -375,6 +372,7 @@ namespace OLEDSaver
                 }
                 try
                 {
+
 
                     IntPtr hThread = OpenThread(THREAD_SET_INFORMATION | THREAD_QUERY_INFORMATION, false, (uint)thread.Id);
                     if (hThread != IntPtr.Zero)
