@@ -1,4 +1,4 @@
-OLED Saver
+# **OLED Saver**
 
 A Windows utility designed to prevent OLED screen burn-in by automatically hiding UI elements and managing display behavior during periods of inactivity.
 
@@ -11,6 +11,8 @@ Hide Desktop Icons: Hide desktop icons to prevent static elements from burning i
 Black Overlay: Draw black overlays around application windows or full-screen black overlays during inactivity to protect OLED pixels
 
 Display Off: Turn off displays completely after extended inactivity
+
+# **Useful links**
 
 https://mactype.net/
 
