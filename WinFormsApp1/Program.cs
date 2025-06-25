@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
 
 
@@ -49,7 +50,9 @@ namespace OLEDSaver
         private static Timer _inactivityTimer;
         private static Point _lastCursorPos = Point.Empty;
         private static DateTime _lastActiveTime = DateTime.Now;
-        private static readonly TimeSpan InactivityThreshold = TimeSpan.FromSeconds(1); 
+        private static readonly TimeSpan InactivityThreshold = TimeSpan.FromSeconds(1);
+        private static DateTime _lastWindowsKeyTime = DateTime.MinValue;
+        private static readonly TimeSpan _winKeyShowDuration = TimeSpan.FromSeconds(3);
         private static bool _enableInterpolation = true;
         private static Rectangle _previousTargetRect = Rectangle.Empty;
         private static Rectangle _lastWindowBounds = Rectangle.Empty;
@@ -395,8 +398,23 @@ namespace OLEDSaver
             _edgeTimer.Tick += (s, e) =>
             {
                 if (!_taskbarHidingEnabled) return;
+
+                if (IsWindowsKeyPressed())
+                {
+                    _lastWindowsKeyTime = DateTime.Now;
+                    ShowTaskbarAndDesktop();
+                    return;
+                }
+
+                if ((DateTime.Now - _lastWindowsKeyTime) < _winKeyShowDuration)
+                {
+                    ShowTaskbarAndDesktop();
+                    return;
+                }
+
                 var pos = Cursor.Position;
                 var bottom = Screen.PrimaryScreen.Bounds.Bottom;
+
                 if (pos.Y >= bottom - _activityThreshold)
                     ShowTaskbarAndDesktop();
                 else
@@ -404,6 +422,7 @@ namespace OLEDSaver
             };
             _edgeTimer.Start();
         }
+
 
         private static void InitializeMonitorSettings()
         {
@@ -1160,7 +1179,7 @@ namespace OLEDSaver
                     return;
 
                 var json = File.ReadAllText(SettingsFilePath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json); // Исправлено: добавлен тип
+                var settings = JsonSerializer.Deserialize<AppSettings>(json);
 
                 if (settings != null)
                 {
@@ -1179,8 +1198,7 @@ namespace OLEDSaver
 
                     if (settings.ExcludedWindowTitles != null)
                         _excludedWindowTitles = settings.ExcludedWindowTitles.ToList();
-
-                    // Добавим отладочную информацию
+                    
                     if (settings.MonitorSettings != null)
                     {
                         foreach (var kvp in settings.MonitorSettings)
@@ -1488,7 +1506,7 @@ namespace OLEDSaver
                 {
                     if (enable)
                     {
-                        key.SetValue(appName, $"\"{exePath}\"");
+                        key.SetValue(appName, exePath);
                     }
                     else
                     {
@@ -1499,6 +1517,7 @@ namespace OLEDSaver
             catch (Exception ex)
             {}
         }
+
 
         private static bool IsAutoStartEnabled()
         {
@@ -1518,10 +1537,6 @@ namespace OLEDSaver
             }
         }
 
-
-
-
-
         private static bool IsVideoPlaying()
         {
             try
@@ -1537,7 +1552,6 @@ namespace OLEDSaver
                 string cls = className.ToString().ToLower();
                 string ttl = title.ToString().ToLower();
 
-                // Получаем имя процесса для текущего окна
                 string processName = "";
                 try
                 {
@@ -1553,7 +1567,6 @@ namespace OLEDSaver
                     processName = "";
                 }
 
-                // Проверяем исключения - если найдено, то ВСЕГДА считаем как видео (блокируем оверлей)
                 if (_excludedWindowTitles.Any(excluded =>
                 {
                     string excludedLower = excluded.ToLower();
@@ -1725,6 +1738,17 @@ namespace OLEDSaver
 
         private static readonly Dictionary<Screen, OverlayForm> _blackOverlays = new Dictionary<Screen, OverlayForm>();
 
+
+        private const int VK_LWIN = 0x5B;
+        private const int VK_RWIN = 0x5C;
+
+        private static bool IsWindowsKeyPressed()
+        {
+            return (GetAsyncKeyState(VK_LWIN) & 0x8000) != 0 ||
+                   (GetAsyncKeyState(VK_RWIN) & 0x8000) != 0;
+        }
+
+
         private static void CheckInactivity()
         {
             double idleSeconds = GetIdleTimeSeconds();
@@ -1746,6 +1770,7 @@ namespace OLEDSaver
                         overlay.Hide();
                 }
             }
+
 
             if (_drawBlackOverlay)
             {
