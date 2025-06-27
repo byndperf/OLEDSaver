@@ -4,10 +4,9 @@ using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
-
+using IWshRuntimeLibrary;
+using File = System.IO.File;
 
 namespace OLEDSaver
 {
@@ -92,6 +91,8 @@ namespace OLEDSaver
         private static List<string> _excludedWindowTitles = new();
         private static List<string> _excludedProcesses = new();
         private static StringBuilder _sbTitle = new(256);
+        private static string StartupFolderPath => Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        private static string ShortcutPath => Path.Combine(StartupFolderPath, "OLEDSaver.lnk");
 
         // -------------------------------
 
@@ -1198,7 +1199,7 @@ namespace OLEDSaver
 
                     if (settings.ExcludedWindowTitles != null)
                         _excludedWindowTitles = settings.ExcludedWindowTitles.ToList();
-                    
+
                     if (settings.MonitorSettings != null)
                     {
                         foreach (var kvp in settings.MonitorSettings)
@@ -1494,47 +1495,71 @@ namespace OLEDSaver
             }
         }
 
-        private static void EnableAutoStart(bool enable)
+        public static void EnableAutoStart(bool enable)
         {
             try
             {
-                string appName = "OLEDSaver";
-                string exePath = Application.ExecutablePath;
-
-                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                if (enable)
                 {
-                    if (enable)
-                    {
-                        key.SetValue(appName, exePath);
-                    }
-                    else
-                    {
-                        key.DeleteValue(appName, false);
-                    }
+                    CreateShortcut();
+                }
+                else
+                {
+                    RemoveShortcut();
                 }
             }
             catch (Exception ex)
-            {}
+            {
+            }
         }
 
+        private static void CreateShortcut()
+        {
+            WshShell shell = new WshShell();
+            IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(ShortcutPath);
 
-        private static bool IsAutoStartEnabled()
+            shortcut.Description = "OLEDSaver Auto Start";
+            shortcut.TargetPath = Application.ExecutablePath;
+            shortcut.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+
+            shortcut.Save();
+        }
+
+        private static void RemoveShortcut()
+        {
+            if (File.Exists(ShortcutPath))
+            {
+                File.Delete(ShortcutPath);
+            }
+        }
+
+        public static bool IsAutoStartEnabled()
+        {
+            return File.Exists(ShortcutPath);
+        }
+
+        public static bool IsShortcutValid()
         {
             try
             {
-                string appName = "OLEDSaver";
-                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Run", false))
-                {
-                    var value = key?.GetValue(appName) as string;
-                    return !string.IsNullOrEmpty(value);
-                }
+                if (!File.Exists(ShortcutPath))
+                    return false;
+
+                WshShell shell = new WshShell();
+                IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(ShortcutPath);
+
+                return shortcut.TargetPath.Equals(Application.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase);
             }
             catch
             {
                 return false;
             }
+        }
+
+        public static string GetStartupFolder()
+        {
+            return StartupFolderPath;
         }
 
         private static bool IsVideoPlaying()
